@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Change password{% endblock %}
+{% block content %}
+<div class="row"><div class="col-md-5">
+  <div class="card p-4"><h5>Change password</h5>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input class="form-control mb-3" type="password" name="old_password" placeholder="Current password" required>
+    <input class="form-control mb-3" type="password" name="new_password" placeholder="New password (6+ chars)" required>
+    <button class="btn btn-dark">Update</button>
+  </form></div>
+</div></div>
+{% endblock %}

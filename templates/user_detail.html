@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }}{% endblock %}
+{% block content %}
+<h3>{{ user.name }} <small class="text-muted fs-6">{{ user.roll_no or '' }} {{ user.department or '' }}</small></h3>
+<p>Face data: {% if has_face %}<span class="badge text-bg-success">captured</span>{% else %}<span class="badge text-bg-secondary">none</span>{% endif %}
+ · {{ 'Active' if user.active else 'Inactive' }}{% if user.email %} · {{ user.email }}{% endif %}</p>
+{% if me %}<div class="card p-3 mb-3"><b>Last 30 days:</b> {{ me.attended }} attended ({{ me.late }} late), {{ me.absent }} absent of {{ working }} working days — {{ me.percent }}%</div>{% endif %}
+<div class="card p-3"><table class="table table-sm mb-0"><thead><tr><th>Date</th><th>Time</th><th>Status</th><th>Via</th></tr></thead><tbody>
+{% for r in recs %}<tr><td>{{ r.date }}</td><td>{{ r.time }}</td><td>{{ r.status }}</td><td>{{ r.method }}</td></tr>
+{% else %}<tr><td colspan="4" class="text-muted">No records yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

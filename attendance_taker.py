@@ -8,6 +8,8 @@ import logging
 import sqlite3
 import datetime
 
+import db
+
 
 # Dlib  / Use frontal face detector of Dlib
 detector = dlib.get_frontal_face_detector()
@@ -18,20 +20,8 @@ predictor = dlib.shape_predictor('data/data_dlib/shape_predictor_68_face_landmar
 # Dlib Resnet Use Dlib resnet50 model to get 128D face descriptor
 face_reco_model = dlib.face_recognition_model_v1("data/data_dlib/dlib_face_recognition_resnet_model_v1.dat")
 
-# Create a connection to the database
-conn = sqlite3.connect("attendance.db")
-cursor = conn.cursor()
-
-# Create a table for the current date
-current_date = datetime.datetime.now().strftime("%Y_%m_%d")  # Replace hyphens with underscores
-table_name = "attendance" 
-create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} (name TEXT, time TEXT, date DATE, UNIQUE(name, date))"
-cursor.execute(create_table_sql)
-
-
-# Commit changes and close the connection
-conn.commit()
-conn.close()
+# Shared database layer (creates/upgrades attendance.db)
+db.init_db()
 
 
 class Face_Recognizer:
@@ -79,6 +69,10 @@ class Face_Recognizer:
         #  Reclassify after 'reclassify_interval' frames
         self.reclassify_interval_cnt = 0
         self.reclassify_interval = 10
+
+        # names already logged today (avoid a DB hit every frame)
+        self.logged_today = set()
+        self.logged_date = ''
 
     #  "features_all.csv"  / Get known faces from "features_all.csv"
     def get_face_database(self):
@@ -157,23 +151,24 @@ class Face_Recognizer:
                                  cv2.LINE_AA)
     # insert data in database
 
-    def attendance(self, name):
-        current_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        conn = sqlite3.connect("attendance.db")
-        cursor = conn.cursor()
-        # Check if the name already has an entry for the current date
-        cursor.execute("SELECT * FROM attendance WHERE name = ? AND date = ?", (name, current_date))
-        existing_entry = cursor.fetchone()
-
-        if existing_entry:
-            print(f"{name} is already marked as present for {current_date}")
+    def attendance(self, name, distance=None):
+        """Log attendance via db.log_attendance (handles duplicates, Late status,
+        inactive users). `self.logged_today` avoids hitting the DB every frame."""
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        if self.logged_date != today:
+            self.logged_today, self.logged_date = set(), today
+        if name in self.logged_today:
+            return
+        # confidence: 0 (bad match) .. 1 (perfect) from the e-distance
+        confidence = None if distance is None else round(max(0.0, 1 - distance / 0.4), 2)
+        inserted, status = db.log_attendance(name, method="face", confidence=confidence)
+        self.logged_today.add(name)
+        if inserted:
+            print(f"{name} marked {status} at {datetime.datetime.now():%H:%M:%S}")
+        elif status == "inactive":
+            print(f"{name} is deactivated - not marked")
         else:
-            current_time = datetime.datetime.now().strftime('%H:%M:%S')
-            cursor.execute("INSERT INTO attendance (name, time, date) VALUES (?, ?, ?)", (name, current_time, current_date))
-            conn.commit()
-            print(f"{name} marked as present for {current_date} at {current_time}")
-
-        conn.close()
+            print(f"{name} already marked today")
 
     #  Face detection and recognition wit OT from input video stream
     def process(self, stream):
@@ -293,11 +288,8 @@ class Face_Recognizer:
                                               self.face_name_known_list[similar_person_num])
                                 
                                 # Insert attendance record
-                                nam =self.face_name_known_list[similar_person_num]
-
-                                print(type(self.face_name_known_list[similar_person_num]))
-                                print(nam)
-                                self.attendance(nam)
+                                self.attendance(self.face_name_known_list[similar_person_num],
+                                                min(self.current_frame_face_X_e_distance_list))
                             else:
                                 logging.debug("  Face recognition result: Unknown person")
 

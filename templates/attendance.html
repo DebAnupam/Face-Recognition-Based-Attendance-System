@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Attendance{% endblock %}
+{% block content %}
+<h3>Attendance Log</h3>
+<form class="row g-2 mb-3 no-print" method="get">
+  <div class="col-auto"><input type="date" class="form-control" name="date" value="{{ date }}"></div>
+  <div class="col-auto"><input class="form-control" name="q" placeholder="Search name" value="{{ q }}"></div>
+  <div class="col-auto"><button class="btn btn-dark">Show</button></div>
+  <div class="col-auto"><a class="btn btn-outline-secondary" href="{{ url_for('export_csv', start=date, end=date) }}">Download CSV</a></div>
+</form>
+<p class="text-muted">{{ summary.marked }} of {{ summary.total }} marked ({{ summary.late }} late) · {{ summary.rate }}%</p>
+
+<div class="row g-3">
+  <div class="col-lg-8"><div class="card p-3">
+    <h6>Marked present</h6>
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Name</th><th>Roll</th><th>Time</th><th>Status</th><th>Via</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr><td>{{ r.name }}</td><td>{{ r.roll_no or '' }}</td><td>{{ r.time }}</td>
+        <td><span class="badge text-bg-{{ 'warning' if r.status == 'Late' else 'success' }}">{{ r.status }}</span></td>
+        <td class="text-muted small">{{ r.method }}</td>
+        <td class="text-end">{% if role == 'admin' %}
+          <form method="post" action="{{ url_for('delete_record', rowid=r.id) }}" onsubmit="return confirm('Delete this record?')">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">✕</button></form>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="6" class="text-muted">No records for this date.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+
+  <div class="col-lg-4"><div class="card p-3">
+    <h6>Absent ({{ absent|length }}) <small class="text-muted">– mark manually</small></h6>
+    <ul class="list-group list-group-flush">
+    {% for u in absent %}
+      <li class="list-group-item px-0">
+        <form class="d-flex gap-1" method="post" action="{{ url_for('mark_manual') }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="user_id" value="{{ u.id }}"><input type="hidden" name="date" value="{{ date }}">
+          <span class="flex-grow-1">{{ u.name }}</span>
+          <select name="status" class="form-select form-select-sm w-auto"><option>Present</option><option>Late</option></select>
+          <button class="btn btn-sm btn-outline-success">Mark</button>
+        </form>
+      </li>
+    {% else %}<li class="list-group-item text-muted px-0">Everyone is marked 🎉</li>{% endfor %}
+    </ul>
+  </div></div>
+</div>
+{% endblock %}

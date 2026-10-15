@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<h3>Attendance Report</h3>
+<form class="row g-2 mb-3 no-print" method="get">
+  <div class="col-auto"><label class="form-label small mb-0">From</label><input type="date" class="form-control" name="start" value="{{ start }}"></div>
+  <div class="col-auto"><label class="form-label small mb-0">To</label><input type="date" class="form-control" name="end" value="{{ end }}"></div>
+  <div class="col-auto align-self-end"><button class="btn btn-dark">Generate</button></div>
+  <div class="col-auto align-self-end"><a class="btn btn-outline-secondary" href="{{ url_for('export_csv', start=start, end=end, kind='summary') }}">Summary CSV</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('export_csv', start=start, end=end, kind='records') }}">All records CSV</a>
+    <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Print</button></div>
+</form>
+<p class="text-muted">{{ settings.institution }} · {{ start }} to {{ end }} · {{ working }} working day(s) (days with at least one check-in)</p>
+<div class="card p-3"><table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Name</th><th>Roll</th><th>Dept</th><th>Present</th><th>Late</th><th>Absent</th><th style="width:25%">Attendance</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td><a href="{{ url_for('user_detail', uid=r.id) }}">{{ r.name }}</a></td><td>{{ r.roll_no or '' }}</td><td>{{ r.department or '' }}</td>
+    <td>{{ r.present }}</td><td>{{ r.late }}</td><td>{{ r.absent }}</td>
+    <td><div class="progress" style="height:18px"><div class="progress-bar {{ 'bg-success' if r.percent >= 75 else 'bg-danger' }}" style="width:{{ r.percent }}%">{{ r.percent }}%</div></div></td></tr>
+  {% else %}<tr><td colspan="7" class="text-muted">No users yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+<p class="small text-muted mt-2">Red bar = below 75% attendance.</p>
+{% endblock %}

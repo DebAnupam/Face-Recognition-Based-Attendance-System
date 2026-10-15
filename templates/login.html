@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5"><div class="col-md-4">
+  <div class="card p-4">
+    <h4 class="mb-3 text-center">{{ settings.institution }}<br><small class="text-muted">Attendance System</small></h4>
+    <form method="post">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input class="form-control mb-3" name="username" placeholder="Username" required autofocus>
+      <input class="form-control mb-3" type="password" name="password" placeholder="Password" required>
+      <button class="btn btn-dark w-100">Sign in</button>
+    </form>
+  </div>
+</div></div>
+{% endblock %}

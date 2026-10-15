@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">User Management</h3>
+  {% if role == 'admin' %}<div>
+    <form class="d-inline" method="post" action="{{ url_for('rebuild_features') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn btn-outline-secondary">Rebuild face features</button></form>
+    <a class="btn btn-dark" href="{{ url_for('user_form') }}">+ Add user</a></div>{% endif %}
+</div>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#students">Students ({{ users|length }})</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#staff">Staff &amp; settings</button></li>
+</ul>
+<div class="tab-content">
+<div class="tab-pane fade show active" id="students"><div class="card p-3">
+  <table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Name</th><th>Roll</th><th>Dept</th><th>Email</th><th>Face data</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    <tr class="{{ '' if u.active else 'text-muted' }}">
+      <td><a href="{{ url_for('user_detail', uid=u.id) }}">{{ u.name }}</a></td><td>{{ u.roll_no or '' }}</td><td>{{ u.department or '' }}</td><td>{{ u.email or '' }}</td>
+      <td>{% if face[u.name] %}<span class="badge text-bg-success">captured</span>{% else %}<span class="badge text-bg-secondary">none</span>{% endif %}</td>
+      <td>{{ 'Active' if u.active else 'Inactive' }}</td>
+      <td class="text-end text-nowrap">{% if role == 'admin' %}
+        <a class="btn btn-sm btn-success" href="{{ url_for('face_register', uid=u.id) }}">{{ 'Re-register face' if face[u.name] else 'Register face' }}</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('user_form', uid=u.id) }}">Edit</a>
+        <form class="d-inline" method="post" action="{{ url_for('user_toggle', uid=u.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">{{ 'Deactivate' if u.active else 'Activate' }}</button></form>
+        <form class="d-inline" method="post" action="{{ url_for('user_delete', uid=u.id) }}" onsubmit="return confirm('Delete {{ u.name }} and ALL their attendance records?')"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="text-muted">No users yet.</td></tr>{% endfor %}
+    </tbody></table>
+</div>
+<p class="small text-muted mt-2">To enable face recognition for a user, click <b>Register face</b> and capture photos with the webcam. Use <b>Rebuild face features</b> only if you added photos by hand or with the old Tkinter tool.</p>
+</div>
+
+<div class="tab-pane fade" id="staff">
+  <div class="row g-3">
+    <div class="col-md-6"><div class="card p-3"><h6>Staff accounts</h6>
+      <table class="table table-sm align-middle">
+        {% for s in staff %}<tr><td>{{ s.username }}</td><td><span class="badge text-bg-{{ 'dark' if s.role == 'admin' else 'secondary' }}">{{ s.role }}</span></td>
+        <td class="text-end">{% if role == 'admin' %}<form method="post" action="{{ url_for('staff_delete', sid=s.id) }}" onsubmit="return confirm('Delete this account?')"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form>{% endif %}</td></tr>{% endfor %}
+      </table>
+      {% if role == 'admin' %}
+      <form method="post" action="{{ url_for('staff_new') }}" class="row g-2">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <div class="col-4"><input class="form-control form-control-sm" name="username" placeholder="Username" required></div>
+        <div class="col-4"><input class="form-control form-control-sm" type="password" name="password" placeholder="Password" required></div>
+        <div class="col-2"><select class="form-select form-select-sm" name="role"><option>teacher</option><option>admin</option></select></div>
+        <div class="col-2"><button class="btn btn-sm btn-dark w-100">Add</button></div>
+      </form>{% endif %}
+      <p class="small text-muted mt-2 mb-0"><b>admin</b>: everything. <b>teacher</b>: view dashboard/reports, mark manual attendance.</p>
+    </div></div>
+    {% if role == 'admin' %}<div class="col-md-6"><div class="card p-3"><h6>Settings</h6>
+      <form method="post" action="{{ url_for('save_settings') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <label class="form-label small">Institution name</label><input class="form-control mb-2" name="institution" value="{{ settings.institution }}">
+        <label class="form-label small">Mark as "Late" after (24h, HH:MM)</label><input class="form-control mb-3" name="late_after" value="{{ settings.late_after }}" pattern="([01]\d|2[0-3]):[0-5]\d">
+        <button class="btn btn-dark">Save</button>
+      </form></div></div>{% endif %}
+  </div>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}<script>if (location.hash === '#staff') new bootstrap.Tab(document.querySelector('[data-bs-target="#staff"]')).show();</script>{% endblock %}

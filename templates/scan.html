@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Scan{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Face Scan</h3>
+  <span class="text-muted small">{{ known }} registered face(s)</span>
+</div>
+{% if not engine_ok %}
+<div class="alert alert-danger"><b>Face recognition is not ready:</b> {{ engine_msg }}</div>
+{% elif known == 0 %}
+<div class="alert alert-warning">No faces registered yet. Go to <a href="{{ url_for('users') }}">Users</a> and click <b>Register face</b> first.</div>
+{% endif %}
+<div class="row g-3">
+  <div class="col-lg-8"><div class="card p-3">
+    <div class="position-relative bg-dark rounded overflow-hidden" style="max-width:720px">
+      <video id="video" class="w-100 d-block" autoplay playsinline muted></video>
+      <canvas id="overlay" class="position-absolute top-0 start-0 w-100 h-100"></canvas>
+      <div id="placeholder" class="text-white-50 text-center py-5 position-absolute top-50 start-50 translate-middle">Camera is off</div>
+    </div>
+    <div class="mt-3">
+      <button id="btn" class="btn btn-dark" {{ 'disabled' if not engine_ok }}>Start camera</button>
+      <span id="msg" class="ms-3 text-muted small"></span>
+    </div>
+  </div></div>
+  <div class="col-lg-4"><div class="card p-3">
+    <h6>Marked in this session</h6>
+    <ul class="list-group list-group-flush" id="log"><li class="list-group-item text-muted px-0">Nobody yet.</li></ul>
+    <p class="small text-muted mt-3 mb-0">Each person is marked once per day. Already-marked people are shown in blue, unknown faces in red.</p>
+  </div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const video = document.getElementById('video'), canvas = document.getElementById('overlay'), ctx = canvas.getContext('2d');
+const btn = document.getElementById('btn'), msg = document.getElementById('msg'), logEl = document.getElementById('log');
+const grab = document.createElement('canvas');
+let stream = null, running = false, seen = new Set();
+
+async function start() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 640}, height: {ideal: 480}}});
+  } catch (e) { msg.textContent = 'Cannot open the camera: ' + e.message + ' (allow camera access in the browser).'; return; }
+  video.srcObject = stream; await video.play();
+  document.getElementById('placeholder').style.display = 'none';
+  running = true; btn.textContent = 'Stop camera'; msg.textContent = 'Scanning…'; loop();
+}
+function stop() {
+  running = false; if (stream) stream.getTracks().forEach(t => t.stop());
+  video.srcObject = null; ctx.clearRect(0, 0, canvas.width, canvas.height);
+  document.getElementById('placeholder').style.display = ''; btn.textContent = 'Start camera'; msg.textContent = '';
+}
+btn.onclick = () => running ? stop() : start();
+
+async function loop() {
+  while (running) {
+    try {
+      const w = 480, h = Math.round(video.videoHeight * w / video.videoWidth) || 360;
+      grab.width = w; grab.height = h; grab.getContext('2d').drawImage(video, 0, 0, w, h);
+      const blob = await new Promise(r => grab.toBlob(r, 'image/jpeg', 0.7));
+      const fd = new FormData(); fd.append('image', blob, 'f.jpg');
+      const r = await fetch('{{ url_for("api_scan") }}', {method: 'POST', body: fd, headers: {'X-CSRF-Token': '{{ csrf_token() }}'}});
+      const d = await r.json();
+      if (!r.ok) { msg.textContent = d.error || 'Server error'; if (r.status === 401) { location.reload(); } await sleep(2000); continue; }
+      msg.textContent = d.faces.length ? '' : 'No face in view';
+      draw(d.faces);
+    } catch (e) { msg.textContent = 'Connection problem – retrying…'; await sleep(1500); }
+    await sleep(250);
+  }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function draw(faces) {
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.lineWidth = 3; ctx.font = '20px sans-serif';
+  faces.forEach(f => {
+    const [x, y, w, h] = [f.box[0] * canvas.width, f.box[1] * canvas.height, f.box[2] * canvas.width, f.box[3] * canvas.height];
+    const color = f.status === 'marked' ? '#198754' : f.status === 'already' ? '#0d6efd' : f.status === 'inactive' ? '#fd7e14' : '#dc3545';
+    const label = (f.name || 'Unknown') + (f.status === 'marked' ? ' ✓ marked' : f.status === 'already' ? ' (already marked)' : f.status === 'inactive' ? ' (inactive)' : '');
+    ctx.strokeStyle = color; ctx.strokeRect(x, y, w, h);
+    const tw = ctx.measureText(label).width + 12; ctx.fillStyle = color; ctx.fillRect(x, Math.max(y - 28, 0), tw, 28);
+    ctx.fillStyle = '#fff'; ctx.fillText(label, x + 6, Math.max(y - 7, 21));
+    if (f.status === 'marked' && !seen.has(f.name)) { seen.add(f.name); addLog(f.name, f.label); }
+  });
+}
+function addLog(name, status) {
+  if (seen.size === 1) logEl.innerHTML = '';
+  const li = document.createElement('li'); li.className = 'list-group-item px-0 d-flex justify-content-between';
+  const a = document.createElement('span'); a.textContent = name;
+  const b = document.createElement('span'); b.className = 'small text-muted'; b.textContent = new Date().toLocaleTimeString() + ' · ' + status;
+  li.append(a, b); logEl.prepend(li);
+}
+window.addEventListener('beforeunload', () => stream && stream.getTracks().forEach(t => t.stop()));
+</script>
+{% endblock %}

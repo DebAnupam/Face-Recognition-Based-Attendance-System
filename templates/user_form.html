@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if user else 'Add' }} user{% endblock %}
+{% block content %}
+<div class="row"><div class="col-md-6"><div class="card p-4">
+  <h5>{{ 'Edit' if user else 'Add' }} user</h5>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label class="form-label">Name <span class="text-muted small">(must match the name used when capturing the face)</span></label>
+    <input class="form-control mb-3" name="name" required value="{{ user.name if user else request.form.name }}">
+    <label class="form-label">Roll no.</label><input class="form-control mb-3" name="roll_no" value="{{ user.roll_no or '' if user else '' }}">
+    <label class="form-label">Department</label><input class="form-control mb-3" name="department" value="{{ user.department or '' if user else '' }}">
+    <label class="form-label">Email</label><input class="form-control mb-3" type="email" name="email" value="{{ user.email or '' if user else '' }}">
+    {% if user %}<div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="active" id="act" {{ 'checked' if user.active }}><label class="form-check-label" for="act">Active</label></div>{% endif %}
+    <button class="btn btn-dark">Save</button> <a class="btn btn-link" href="{{ url_for('users') }}">Cancel</a>
+  </form>
+</div></div></div>
+{% endblock %}

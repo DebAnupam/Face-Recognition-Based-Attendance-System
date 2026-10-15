@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Live Dashboard <small class="text-muted fs-6">{{ today }}</small></h3>
+  <span class="text-muted small"><span id="dot" class="live-dot off"></span><span id="status">connecting…</span></span>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Total students</div><div class="num" id="s-total">–</div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Present today</div><div class="num text-success" id="s-marked">–</div><div class="small text-muted"><span id="s-late">0</span> late</div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Absent so far</div><div class="num text-danger" id="s-absent">–</div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Attendance rate</div><div class="num" id="s-rate">–</div>
+    <div class="progress mt-2" style="height:6px"><div id="s-bar" class="progress-bar bg-success" style="width:0"></div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3 mb-3"><h6>Last 14 days</h6><div style="height:240px"><canvas id="trend"></canvas></div></div>
+    <div class="card p-3"><h6>Check-ins by hour (today)</h6><div style="height:200px"><canvas id="hourly"></canvas></div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3 mb-3"><h6>Today's split</h6><div style="height:200px"><canvas id="donut"></canvas></div></div>
+    <div class="card p-3"><h6>Recent check-ins</h6>
+      <ul class="list-group list-group-flush" id="feed"><li class="list-group-item text-muted">No check-ins yet.</li></ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const mk = (id, cfg) => new Chart($(id), cfg);
+const opts = {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}}};
+const trend  = mk('trend',  {type:'line', data:{labels:[], datasets:[{data:[], borderColor:'#0d6efd', backgroundColor:'rgba(13,110,253,.12)', fill:true, tension:.3}]}, options:opts});
+const hourly = mk('hourly', {type:'bar',  data:{labels:[], datasets:[{data:[], backgroundColor:'#20c997'}]}, options:opts});
+const donut  = mk('donut',  {type:'doughnut', data:{labels:['Present','Late','Absent'], datasets:[{data:[0,0,0], backgroundColor:['#198754','#ffc107','#dc3545']}]},
+                 options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}});
+let lastTop = null;
+
+function render(d) {
+  const s = d.summary;
+  $('s-total').textContent = s.total; $('s-marked').textContent = s.marked; $('s-late').textContent = s.late;
+  $('s-absent').textContent = s.absent; $('s-rate').textContent = s.rate + '%'; $('s-bar').style.width = s.rate + '%';
+  trend.data.labels = d.trend.labels.map(x => x.slice(5)); trend.data.datasets[0].data = d.trend.values; trend.update('none');
+  hourly.data.labels = d.hourly.labels; hourly.data.datasets[0].data = d.hourly.values; hourly.update('none');
+  donut.data.datasets[0].data = [s.present, s.late, s.absent]; donut.update('none');
+
+  const key = d.recent.length ? d.recent[0].name + d.recent[0].date + d.recent[0].time : null;
+  const isNew = lastTop !== null && key !== lastTop;
+  lastTop = key;
+  const feed = $('feed'); feed.innerHTML = '';
+  if (!d.recent.length) feed.innerHTML = '<li class="list-group-item text-muted">No check-ins yet.</li>';
+  d.recent.forEach((r, i) => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between' + (isNew && i === 0 ? ' feed-new' : '');
+    const badge = r.status === 'Late' ? 'warning' : 'success';
+    const left = document.createElement('span'); left.textContent = r.name;
+    const right = document.createElement('span'); right.className = 'small text-muted';
+    right.textContent = (r.date === '{{ today }}' ? '' : r.date + ' ') + r.time + ' ';
+    const b = document.createElement('span'); b.className = 'badge text-bg-' + badge; b.textContent = r.status;
+    right.appendChild(b); li.append(left, right); feed.appendChild(li);
+  });
+}
+
+async function tick() {
+  try {
+    const r = await fetch('{{ url_for("api_live") }}', {headers:{'Accept':'application/json'}});
+    if (r.redirected) { location.href = r.url; return; }
+    render(await r.json());
+    $('dot').classList.remove('off'); $('status').textContent = 'live · updated ' + new Date().toLocaleTimeString();
+  } catch (e) { $('dot').classList.add('off'); $('status').textContent = 'offline – retrying'; }
+}
+tick(); setInterval(tick, 3000);
+</script>
+{% endblock %}
