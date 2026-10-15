@@ -2,9 +2,15 @@
 
 This project is a face recognition-based attendance system that uses OpenCV and Python. The system uses a camera to capture images of individuals and then compares them with the images in the database to mark attendance.
 
+   > **Credits:** This project is a fork of [Arijit1080/Face-Recognition-Based-Attendance-System](https://github.com/Arijit1080/Face-Recognition-Based-Attendance-System).
+   > The original face-registration, feature-extraction and camera-recognition scripts are by Arijit1080.
+   > **Added in this fork (Anupam Deb, ES225 project):** real-time dashboard & analytics, attendance logging & reporting
+   > (Present/Late, date-range reports, CSV export), user management with login/roles, and browser-based face scan and
+   > face registration (`face_engine.py`).
+
 ## Installation
 
-1. Clone the repository to your local machine. ``` git clone https://github.com/Arijit1080/Face-Recognition-Based-Attendance-System ```
+1. Clone the repository to your local machine. ```    git clone https://github.com/DebAnupam/Face-Recognition-Based-Attendance-System.git ```
 2. Use **Python 3.10, 3.11 or 3.12** (3.14 is too new for dlib/OpenCV; replace 3.11 below with your version). Then, in PowerShell:
    ```
    py -3.11 -m venv .venv
